@@ -896,9 +896,10 @@ void BranchAndCutSolver::Solve()
 
     mTimer.BranchAndCut = std::chrono::system_clock::now() - start;
 
-    if (mInputParameters.BranchAndCut.TrackIncrementalFeasibilityProperty)
+    if (mInputParameters.BranchAndCut.RetrieveGeneratedRoutes)
     {
         callback->SaveFeasibleAndPotentiallyExcludedRoutes();
+        callback->SaveSequenceSetsWithLoadingFlags();
     }
 
     auto statistics = SolverStatistics(branchAndCut.GetRuntime(),

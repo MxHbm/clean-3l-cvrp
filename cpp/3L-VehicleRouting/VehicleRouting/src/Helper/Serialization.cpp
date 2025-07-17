@@ -130,6 +130,12 @@ void to_json(json& j, const CPSolverParams& params)
              {"Seed", params.Seed}};
 }
 
+NLOHMANN_JSON_SERIALIZE_ENUM(LoadingStatus,
+                             {{LoadingStatus::Invalid, "Invalid"},
+                              {LoadingStatus::FeasOpt, "FeasOpt"},
+                              {LoadingStatus::Infeasible, "Infeasible"},
+                              {LoadingStatus::Unknown, "Unknown"}});
+
 }
 }
 
@@ -145,6 +151,35 @@ void to_json(json& j, const LoadingProblemParams& params)
 {
     j = json{{"ProblemVariant", params.Variant}, {"SupportArea", params.SupportArea}};
 }
+
+// Convert a SequenceSet ⇄ JSON (represented as an array of arrays)
+inline void to_json(json& j, const Collections::SequenceSet& set)
+{
+    j = json::array();
+    for (const auto& seq: set)
+        j.push_back(seq); // IdVector → array
+}
+
+inline void from_json(const json& j, Collections::SequenceSet& set)
+{
+    set.clear();
+    for (const auto& elt: j)
+        set.insert(elt.get<Collections::IdVector>());
+}
+
+// Convert the outer map ⇄ JSON
+using FeasSequencesMap = std::unordered_map<LoadingFlag, Collections::SequenceSet>;
+inline void to_json(json& j, const FeasSequencesMap& map)
+{
+    j = json::object();
+    for (const auto& [flag, seqSet]: map)
+    {
+        // enum → json (the macro gives you this) → string
+        const std::string key = json(flag).get<std::string>();
+        j[key] = seqSet;
+    }
+}
+
 }
 
 namespace VehicleRouting
@@ -191,7 +226,7 @@ void from_json(const json& j, BranchAndCutParams& params)
     j.at("ActivateHeuristic").get_to(params.ActivateHeuristic);
     j.at("ActivateMemoryManagement").get_to(params.ActivateMemoryManagement);
     j.at("SimpleVersion").get_to(params.SimpleVersion);
-    j.at("TrackIncrementalFeasibilityProperty").get_to(params.TrackIncrementalFeasibilityProperty);
+    j.at("RetrieveGeneratedRoutes").get_to(params.RetrieveGeneratedRoutes);
 }
 
 void to_json(json& j, const BranchAndCutParams& params)
@@ -210,7 +245,7 @@ void to_json(json& j, const BranchAndCutParams& params)
              {"ActivateHeuristic", params.ActivateHeuristic},
              {"ActivateMemoryManagement", params.ActivateMemoryManagement},
              {"SimpleVersion", params.SimpleVersion},
-             {"TrackIncrementalFeasibilityProperty", params.TrackIncrementalFeasibilityProperty}};
+             {"RetrieveGeneratedRoutes", params.RetrieveGeneratedRoutes}};
 }
 
 void from_json(const json& j, UserCutParams& params)

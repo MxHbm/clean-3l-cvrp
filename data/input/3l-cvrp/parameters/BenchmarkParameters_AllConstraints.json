@@ -1,7 +1,7 @@
 {
     "BranchAndCutParams": {
         "ActivateIntraRouteImprovement": true,
-        "ActivateHeuristic": true,
+        "ActivateHeuristic": false,
         "ActivateMemoryManagement": true,
         "ActivateSetPartHeur": true,
         "CutSeparationMaxNodes": 2147483647,
@@ -12,6 +12,7 @@
         "IntraRouteFullEnumThreshold": 6,
         "MinVehicleLiftingThreshold": 0.5,
         "SetPartHeurThreshold": 20,
+        "RetrieveGeneratedRoutes" :true,
         "StartSolution": "ModifiedSavings",
         "TimeLimit": [
             [

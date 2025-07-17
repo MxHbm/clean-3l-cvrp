@@ -44,6 +44,34 @@ void SubtourCallback::SaveFeasibleAndPotentiallyExcludedRoutes() const
     }
 }
 
+
+void SubtourCallback::SaveSequenceSetsWithLoadingFlags() const
+{
+    const auto allFeasibleSets = mLoadingChecker->GetFeasibleSets();
+    const auto allInfeasibleSets = mLoadingChecker->GetInfeasibleSets();
+    const auto allUnknownSets = mLoadingChecker->GetUnknownSets();
+
+    nlohmann::json jsonObj;
+    jsonObj["AllFeasibleRoutes"] = allFeasibleSets;
+    jsonObj["AllInFeasibleRoutes"] = allInfeasibleSets;
+    jsonObj["AllUnknownRoutes"] = allUnknownSets;
+
+    std::ofstream outputFile(mOutputPath + "/Routes2_" + mInstance->Name + ".json");
+    if (!outputFile.is_open())
+    {
+        std::cerr << "Unable to open the route file!\n";
+        return;
+    }
+
+    // manually write top-level keys with compact value per line
+    outputFile << "{\n";
+    outputFile << "  \"AllFeasibleRoutes\": " << jsonObj["AllFeasibleRoutes"].dump() << ",\n";
+    outputFile << "  \"AllInFeasibleRoutes\": " << jsonObj["AllInFeasibleRoutes"].dump() << ",\n";
+    outputFile << "  \"AllUnknownRoutes\": " << jsonObj["AllUnknownRoutes"].dump() << "\n";
+    outputFile << "}\n";
+}
+
+
 void SubtourCallback::callback()
 {
     try
@@ -1033,7 +1061,7 @@ LoadingStatus
     mClock.end();
     CallbackTracker.UpdateElement(CallbackElement::TailPathInequality, mClock.elapsed());
 
-    if (mInputParameters->BranchAndCut.TrackIncrementalFeasibilityProperty)
+    if (mInputParameters->BranchAndCut.RetrieveGeneratedRoutes)
     {
         mLoadingChecker->AddTailTournamentConstraint(subtour.Sequence);
     }

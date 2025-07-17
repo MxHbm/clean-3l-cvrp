@@ -84,6 +84,7 @@ class SubtourCallback : public GRBCallback
     }
 
     void SaveFeasibleAndPotentiallyExcludedRoutes() const;
+    void SaveSequenceSetsWithLoadingFlags() const;
 
   protected:
     GRBVar2D mVariablesX;

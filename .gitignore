@@ -17,4 +17,4 @@ python/.venv/
 # ruff
 .ruff_cache
 
-python/start_cvrp_with_python.py
+#python/start_cvrp_with_python.py

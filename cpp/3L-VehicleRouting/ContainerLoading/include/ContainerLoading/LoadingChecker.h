@@ -116,6 +116,18 @@ class LoadingChecker
     {
         return mTailTournamentConstraintsWithTimeStamps;
     }
+        // New way to get Sets!
+    [[nodiscard]] std::unordered_map<LoadingFlag, Collections::SequenceSet> GetFeasibleSets()
+    {
+        return mFeasSequences;
+    };
+
+    [[nodiscard]] std::unordered_map<LoadingFlag, Collections::SequenceSet> GetInfeasibleSets()
+    {
+        return mInfSequences;
+    };
+
+    [[nodiscard]] std::unordered_map<LoadingFlag, Collections::SequenceSet> GetUnknownSets() { return mUnkSequences; };
 
   private:
     std::chrono::high_resolution_clock::time_point mStartTime;
