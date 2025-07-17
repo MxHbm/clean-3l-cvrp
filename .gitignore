@@ -4,8 +4,17 @@ build/
 # results
 data/output/3l-cvrp/test/
 
+data/output/
+data/input/
+.vscode/
+
+assets/
+assets
+
 # python
 python/visualization/__pycache__/
 python/.venv/
 # ruff
 .ruff_cache
+
+python/start_cvrp_with_python.py
