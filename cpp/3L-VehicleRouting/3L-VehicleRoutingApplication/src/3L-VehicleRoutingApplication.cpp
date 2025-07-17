@@ -86,7 +86,6 @@ void Run(std::string& inputFilePath,
     {
         try
         {
-            std::cout << "Run: " << i << "\n";
             GRBEnv env = GRBEnv(outputPath + "/" + instance.Name + ".LOG");
             inputParameters.MIPSolver.Seed += i;
             BranchAndCutSolver exactAlgorithm(&instance, &env, inputParameters, startSolutionPath, outputPath);
