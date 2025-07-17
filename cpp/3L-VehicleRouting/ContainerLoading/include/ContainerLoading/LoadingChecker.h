@@ -102,20 +102,6 @@ class LoadingChecker
 
     [[nodiscard]] boost::dynamic_bitset<> MakeBitset(size_t size, const Collections::IdVector& sequence) const;
 
-    [[nodiscard]] std::unordered_map<double, Collections::IdVector> GetFeasibleRoutesWithTimeStamps()
-    {
-        return mCompleteFeasSeqWithTimeStamps;
-    };
-
-    void AddTailTournamentConstraint(const Collections::IdVector& sequence)
-    {
-        auto elapsed = GetElapsedTime();
-        mTailTournamentConstraintsWithTimeStamps.insert({elapsed, sequence});
-    }
-    [[nodiscard]] std::unordered_map<double, Collections::IdVector> GetTailTournamentConstraints() const
-    {
-        return mTailTournamentConstraintsWithTimeStamps;
-    }
         // New way to get Sets!
     [[nodiscard]] std::unordered_map<LoadingFlag, Collections::SequenceSet> GetFeasibleSets()
     {
@@ -137,8 +123,6 @@ class LoadingChecker
 
     Collections::SequenceSet mEPHeurInfSequences;
     Collections::SequenceVector mCompleteFeasSeq;
-    std::unordered_map<double, Collections::IdVector> mCompleteFeasSeqWithTimeStamps;
-    std::unordered_map<double, Collections::IdVector> mTailTournamentConstraintsWithTimeStamps;
 
     /// Set of customer combinations that are infeasible.
     /// -> There is no path in combination C that respects all constraints

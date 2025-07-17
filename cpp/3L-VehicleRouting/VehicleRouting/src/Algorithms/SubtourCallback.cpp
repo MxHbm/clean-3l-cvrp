@@ -22,6 +22,7 @@ namespace Algorithms
 using namespace Cuts;
 using namespace Heuristics::Improvement;
 
+/*
 void SubtourCallback::SaveFeasibleAndPotentiallyExcludedRoutes() const
 {
     const auto allRoutes = mLoadingChecker->GetFeasibleRoutesWithTimeStamps();
@@ -43,7 +44,7 @@ void SubtourCallback::SaveFeasibleAndPotentiallyExcludedRoutes() const
         std::cerr << "unable to open the route file!\n ";
     }
 }
-
+*/
 
 void SubtourCallback::SaveSequenceSetsWithLoadingFlags() const
 {
@@ -1060,12 +1061,12 @@ LoadingStatus
     AddLazyConstraints({mLazyConstraintsGenerator->CreateConstraint(CutType::TailTournament, subtour.Sequence)});
     mClock.end();
     CallbackTracker.UpdateElement(CallbackElement::TailPathInequality, mClock.elapsed());
-
+    /*
     if (mInputParameters->BranchAndCut.RetrieveGeneratedRoutes)
     {
         mLoadingChecker->AddTailTournamentConstraint(subtour.Sequence);
     }
-
+    */
     // Check reverse path to
     //   - create new feasible route, or
     //   - create stronger cuts.

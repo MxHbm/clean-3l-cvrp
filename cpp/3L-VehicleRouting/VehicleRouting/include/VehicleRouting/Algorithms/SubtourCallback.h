@@ -83,7 +83,7 @@ class SubtourCallback : public GRBCallback
         InitializeCuts();
     }
 
-    void SaveFeasibleAndPotentiallyExcludedRoutes() const;
+    //void SaveFeasibleAndPotentiallyExcludedRoutes() const;
     void SaveSequenceSetsWithLoadingFlags() const;
 
   protected:

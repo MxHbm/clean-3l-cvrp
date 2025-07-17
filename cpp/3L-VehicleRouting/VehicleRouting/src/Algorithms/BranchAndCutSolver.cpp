@@ -674,7 +674,6 @@ bool BranchAndCutSolver::CheckPath(const Collections::IdVector& path, Container&
         mInfeasibleTailPaths.emplace_back(0, path.front(), path.back());
 
         Collections::IdVector sequence = {path.front(), path.back()};
-        mLoadingChecker->AddTailTournamentConstraint(sequence);
     }
 
     return true;
@@ -898,7 +897,7 @@ void BranchAndCutSolver::Solve()
 
     if (mInputParameters.BranchAndCut.RetrieveGeneratedRoutes)
     {
-        callback->SaveFeasibleAndPotentiallyExcludedRoutes();
+        //callback->SaveFeasibleAndPotentiallyExcludedRoutes();
         callback->SaveSequenceSetsWithLoadingFlags();
     }
 

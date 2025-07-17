@@ -10,7 +10,7 @@ directory_path = os.getcwd()
 command_base =  os.path.join(directory_path,"build/Release/bin/Release/3L-VehicleRoutingApplication.exe")
 output_folder = os.path.join(directory_path,"data/output/3l-cvrp/all-constraints-train-data-classifier/krebs_14440_1200_60_60/")
 input_folder = os.path.join(directory_path,"data/input/3l-cvrp/krebs/")
-parameter_file = os.path.join(directory_path,"data/input/3l-cvrp/parameters/BenchmarkParameters_AllConstraints.json")
+parameter_file = os.path.join(directory_path,"data/input/3l-cvrp/parameters/BenchmarkParameters_AllConstraints_NewData.json")
 number_of_processes = 1
 
 # Navigate to the directorys

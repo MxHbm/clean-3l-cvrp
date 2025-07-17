@@ -1,6 +1,6 @@
 {
     "BranchAndCutParams": {
-        "ActivateHeuristic": true,
+        "ActivateHeuristic": false,
         "ActivateIntraRouteImprovement": true,
         "ActivateMemoryManagement": true,
         "ActivateSetPartHeur": true,
@@ -12,6 +12,7 @@
         "MinVehicleLiftingThreshold": 0.5,
         "SetPartHeurThreshold": 20,
         "SimpleVersion": false,
+        "RetrieveGeneratedRoutes" :true,
         "StartSolution": "ModifiedSavings",
         "TimeLimit": [
             [
@@ -46,8 +47,7 @@
                 "TwoPath",
                 4
             ]
-        ],
-        "TrackIncrementalFeasibilityProperty": true
+        ]
     },
     "CPSolverParams": {
         "EnableCumulativeDimensions": false,

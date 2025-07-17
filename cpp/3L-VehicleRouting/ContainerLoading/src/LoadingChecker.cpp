@@ -294,8 +294,6 @@ void LoadingChecker::AddFeasibleRoute(const Collections::IdVector& route)
 {
     mFeasSequences[Parameters.LoadingProblem.LoadingFlags].insert(route);
     mCompleteFeasSeq.push_back(route);
-    double elapsedAsDouble = GetElapsedTime();
-    mCompleteFeasSeqWithTimeStamps.insert({elapsedAsDouble, route});
 }
 
 void LoadingChecker::AddInfeasibleSequenceEP(const Collections::IdVector& sequence)
