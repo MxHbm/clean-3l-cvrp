@@ -5,6 +5,7 @@
 #include "Algorithms/SubtourCallback.h"
 #include "CommonBasics/Helper/ModelServices.h"
 
+#include "Helper/json_bitset_serializers.hpp"
 #include "nlohmann/json.hpp"
 
 #include <algorithm>
@@ -48,14 +49,22 @@ void SubtourCallback::SaveFeasibleAndPotentiallyExcludedRoutes() const
 
 void SubtourCallback::SaveSequenceSetsWithLoadingFlags() const
 {
+    const auto allFeasibleSequences = mLoadingChecker->GetFeasibleSequences();
+    const auto allInfeasibleSequences = mLoadingChecker->GetInfeasibleSequences();
+    const auto allUnknownSequences = mLoadingChecker->GetUnknownSequences();
+    const auto allInvalidSequences = mLoadingChecker->GetInvalidSequences();
     const auto allFeasibleSets = mLoadingChecker->GetFeasibleSets();
     const auto allInfeasibleSets = mLoadingChecker->GetInfeasibleSets();
     const auto allUnknownSets = mLoadingChecker->GetUnknownSets();
 
     nlohmann::json jsonObj;
-    jsonObj["AllFeasibleRoutes"] = allFeasibleSets;
-    jsonObj["AllInFeasibleRoutes"] = allInfeasibleSets;
-    jsonObj["AllUnknownRoutes"] = allUnknownSets;
+    jsonObj["AllFeasibleRoutes"] = allFeasibleSequences;
+    jsonObj["AllInFeasibleRoutes"] = allInfeasibleSequences;
+    jsonObj["AllUnknownRoutes"] = allUnknownSequences;
+    jsonObj["AllInvalidRoutes"] = allInvalidSequences;
+    jsonObj["AllFeasibleSets"] = allFeasibleSets;
+    jsonObj["AllInFeasibleSets"] = allInfeasibleSets;
+    jsonObj["AllUnknownSets"] = allUnknownSets;
 
     std::ofstream outputFile(mOutputPath + "/Routes2_" + mInstance->Name + ".json");
     if (!outputFile.is_open())
@@ -68,10 +77,13 @@ void SubtourCallback::SaveSequenceSetsWithLoadingFlags() const
     outputFile << "{\n";
     outputFile << "  \"AllFeasibleRoutes\": " << jsonObj["AllFeasibleRoutes"].dump() << ",\n";
     outputFile << "  \"AllInFeasibleRoutes\": " << jsonObj["AllInFeasibleRoutes"].dump() << ",\n";
-    outputFile << "  \"AllUnknownRoutes\": " << jsonObj["AllUnknownRoutes"].dump() << "\n";
+    outputFile << "  \"AllUnknownRoutes\": " << jsonObj["AllUnknownRoutes"].dump() << ",\n";
+    outputFile << "  \"AllInvalidRoutes\": " << jsonObj["AllInvalidRoutes"].dump() << ",\n";
+    outputFile << "  \"AllFeasibleSets\": " << jsonObj["AllFeasibleSets"].dump() << ",\n";
+    outputFile << "  \"AllInFeasibleSets\": " << jsonObj["AllInFeasibleSets"].dump() << ",\n";
+    outputFile << "  \"AllUnknownSets\": " << jsonObj["AllUnknownSets"].dump() << "\n";
     outputFile << "}\n";
 }
-
 
 void SubtourCallback::callback()
 {

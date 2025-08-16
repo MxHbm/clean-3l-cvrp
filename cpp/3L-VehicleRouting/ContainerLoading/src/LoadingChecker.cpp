@@ -96,6 +96,7 @@ LoadingStatus LoadingChecker::ConstraintProgrammingSolver(PackingType packingTyp
 
     if (isCallTypeExact && status == LoadingStatus::Unknown)
     {
+        AddInvalidRoute(stopIds, loadingMask);
         return LoadingStatus::Invalid;
     }
 
@@ -296,6 +297,10 @@ void LoadingChecker::AddFeasibleRoute(const Collections::IdVector& route)
     mCompleteFeasSeq.push_back(route);
 }
 
+void LoadingChecker::AddInvalidRoute(const Collections::IdVector& route, LoadingFlag mask)
+{
+    mInvSequences[mask].insert(route);
+}
 void LoadingChecker::AddInfeasibleSequenceEP(const Collections::IdVector& sequence)
 {
     mEPHeurInfSequences.insert(sequence);
@@ -376,7 +381,8 @@ bool LoadingChecker::SetIsFeasibleCP(const boost::dynamic_bitset<>& set, const L
     }
     else
     {
-        // If support is enabled, only exact matching of sets can be used as removing items can lead to infeasibility.
+        // If support is enabled, only exact matching of sets can be used as removing items can lead to
+        // infeasibility.
         auto setComparer = [set](const boost::dynamic_bitset<>& feasibleCombi) { return set == feasibleCombi; };
 
         if (std::find_if(std::begin(sets), std::end(sets), setComparer) != std::end(sets))
@@ -525,5 +531,4 @@ void LoadingChecker::AddStatus(const Collections::IdVector& sequence,
         }
     }
 }
-
 }

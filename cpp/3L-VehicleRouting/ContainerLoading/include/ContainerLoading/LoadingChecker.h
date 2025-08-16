@@ -33,6 +33,7 @@ class LoadingChecker
             mFeasSequences[flag & Parameters.LoadingProblem.LoadingFlags].reserve(reservedSize);
             mInfSequences[flag & Parameters.LoadingProblem.LoadingFlags].reserve(reservedSize);
             mUnkSequences[flag & Parameters.LoadingProblem.LoadingFlags].reserve(reservedSize);
+            mInvSequences[flag & Parameters.LoadingProblem.LoadingFlags].reserve(reservedSize);
 
             mFeasibleSets[flag & Parameters.LoadingProblem.LoadingFlags].reserve(reservedSize);
             mInfSets[flag & Parameters.LoadingProblem.LoadingFlags].reserve(reservedSize);
@@ -102,18 +103,37 @@ class LoadingChecker
 
     [[nodiscard]] boost::dynamic_bitset<> MakeBitset(size_t size, const Collections::IdVector& sequence) const;
 
-        // New way to get Sets!
-    [[nodiscard]] std::unordered_map<LoadingFlag, Collections::SequenceSet> GetFeasibleSets()
+    // New way to get Sets!
+    [[nodiscard]] std::unordered_map<LoadingFlag, std::vector<boost::dynamic_bitset<>>> GetFeasibleSets()
+    {
+        return mFeasibleSets;
+    };
+    [[nodiscard]] std::unordered_map<LoadingFlag, std::vector<boost::dynamic_bitset<>>> GetInfeasibleSets()
+    {
+        return mInfSets;
+    };
+    [[nodiscard]] std::unordered_map<LoadingFlag, std::vector<boost::dynamic_bitset<>>> GetUnknownSets()
+    {
+        return mUnknownSets;
+    };
+
+    // New way to get Sequences!
+    [[nodiscard]] std::unordered_map<LoadingFlag, Collections::SequenceSet> GetFeasibleSequences()
     {
         return mFeasSequences;
     };
-
-    [[nodiscard]] std::unordered_map<LoadingFlag, Collections::SequenceSet> GetInfeasibleSets()
+    [[nodiscard]] std::unordered_map<LoadingFlag, Collections::SequenceSet> GetInfeasibleSequences()
     {
         return mInfSequences;
     };
-
-    [[nodiscard]] std::unordered_map<LoadingFlag, Collections::SequenceSet> GetUnknownSets() { return mUnkSequences; };
+    [[nodiscard]] std::unordered_map<LoadingFlag, Collections::SequenceSet> GetUnknownSequences()
+    {
+        return mUnkSequences;
+    };
+    [[nodiscard]] std::unordered_map<LoadingFlag, Collections::SequenceSet> GetInvalidSequences()
+    {
+        return mInvSequences;
+    };
 
   private:
     std::chrono::high_resolution_clock::time_point mStartTime;
@@ -138,10 +158,14 @@ class LoadingChecker
     std::unordered_map<LoadingFlag, std::vector<boost::dynamic_bitset<>>> mUnknownSets;
     std::unordered_map<LoadingFlag, Collections::SequenceSet> mUnkSequences;
 
+    std::unordered_map<LoadingFlag, Collections::SequenceSet> mInvSequences;
+
     [[nodiscard]] bool SequenceIsHeuristicallyInfeasibleEP(const Collections::IdVector& sequence) const;
     void AddInfeasibleSequenceEP(const Collections::IdVector& sequence);
 
     void AddFeasibleRoute(const Collections::IdVector& route);
+
+    void AddInvalidRoute(const Collections::IdVector& route, LoadingFlag mask);
 
     [[nodiscard]] bool SequenceIsInfeasibleCP(const Collections::IdVector& sequence, LoadingFlag mask) const;
     [[nodiscard]] bool SequenceIsUnknownCP(const Collections::IdVector& sequence, LoadingFlag mask) const;

@@ -1,7 +1,6 @@
 #pragma once
 
 #include "ContainerLoading/Helper/Serialization.h"
-
 #include "nlohmann/json.hpp"
 
 using json = nlohmann::json;

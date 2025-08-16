@@ -79,7 +79,12 @@ void Run(std::string& inputFilePath,
     ////std::cout.rdbuf(ofs.rdbuf());
 
     // TODO: parametrize
-    std::string startSolutionPath = inputFilePath + "../StartSolutions/Zhang/ConvertedSolutions/";
+    inputParameters.MIPSolver.Seed += seedOffset;
+
+    std::filesystem::path inputPath(inputFilePath);
+    std::filesystem::path startSolutionPath = inputPath.parent_path().parent_path() / "start_solutions_krebs/";
+    std::string startSolutionPathStr = startSolutionPath.string();
+
     inputParameters.MIPSolver.Seed += seedOffset;
 
     for (int i = 0; i < 1; ++i)
@@ -88,7 +93,7 @@ void Run(std::string& inputFilePath,
         {
             GRBEnv env = GRBEnv(outputPath + "/" + instance.Name + ".LOG");
             inputParameters.MIPSolver.Seed += i;
-            BranchAndCutSolver exactAlgorithm(&instance, &env, inputParameters, startSolutionPath, outputPath);
+            BranchAndCutSolver exactAlgorithm(&instance, &env, inputParameters, startSolutionPathStr, outputPath);
             exactAlgorithm.Solve();
         }
         catch (GRBException& e)

@@ -160,13 +160,6 @@ inline void to_json(json& j, const Collections::SequenceSet& set)
         j.push_back(seq); // IdVector → array
 }
 
-inline void from_json(const json& j, Collections::SequenceSet& set)
-{
-    set.clear();
-    for (const auto& elt: j)
-        set.insert(elt.get<Collections::IdVector>());
-}
-
 // Convert the outer map ⇄ JSON
 using FeasSequencesMap = std::unordered_map<LoadingFlag, Collections::SequenceSet>;
 inline void to_json(json& j, const FeasSequencesMap& map)

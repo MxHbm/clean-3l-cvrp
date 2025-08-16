@@ -324,7 +324,7 @@ std::vector<Route> BranchAndCutSolver::SetGivenStartSolution()
 
     std::string problemVariantString = mInputParameters.ContainerLoading.LoadingProblem.GetVariantString();
     std::string startSolutionFilePath =
-        mStartSolutionFolderPath + problemVariantString + "/" + mInstance->Name + ".json";
+        mStartSolutionFolderPath + problemVariantString + "/" + "StartSolution-" + mInstance->Name + ".json";
 
     bool isRegularFile = std::filesystem::is_regular_file(startSolutionFilePath);
     if (!isRegularFile)
@@ -897,7 +897,7 @@ void BranchAndCutSolver::Solve()
 
     if (mInputParameters.BranchAndCut.RetrieveGeneratedRoutes)
     {
-        //callback->SaveFeasibleAndPotentiallyExcludedRoutes();
+        // callback->SaveFeasibleAndPotentiallyExcludedRoutes();
         callback->SaveSequenceSetsWithLoadingFlags();
     }
 
