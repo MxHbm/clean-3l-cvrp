@@ -75,13 +75,17 @@ void SubtourCallback::SaveSequenceSetsWithLoadingFlags() const
 
     // manually write top-level keys with compact value per line
     outputFile << "{\n";
-    outputFile << "  \"AllFeasibleRoutes\": " << jsonObj["AllFeasibleRoutes"].dump() << ",\n";
-    outputFile << "  \"AllInFeasibleRoutes\": " << jsonObj["AllInFeasibleRoutes"].dump() << ",\n";
-    outputFile << "  \"AllUnknownRoutes\": " << jsonObj["AllUnknownRoutes"].dump() << ",\n";
-    outputFile << "  \"AllInvalidRoutes\": " << jsonObj["AllInvalidRoutes"].dump() << ",\n";
-    outputFile << "  \"AllFeasibleSets\": " << jsonObj["AllFeasibleSets"].dump() << ",\n";
-    outputFile << "  \"AllInFeasibleSets\": " << jsonObj["AllInFeasibleSets"].dump() << ",\n";
-    outputFile << "  \"AllUnknownSets\": " << jsonObj["AllUnknownSets"].dump() << "\n";
+    outputFile << "\"Sequences\":{\n";
+    outputFile << "  \"AllFeasible\": " << jsonObj["AllFeasibleRoutes"].dump() << ",\n";
+    outputFile << "  \"AllInFeasibles\": " << jsonObj["AllInFeasibleRoutes"].dump() << ",\n";
+    outputFile << "  \"AllUnknown\": " << jsonObj["AllUnknownRoutes"].dump() << ",\n";
+    outputFile << "  \"AllInvalid\": " << jsonObj["AllInvalidRoutes"].dump() << "\n";
+    outputFile << "},\n";
+    outputFile << "\"Sets\":{\n";
+    outputFile << "  \"AllFeasible\": " << jsonObj["AllFeasibleSets"].dump() << ",\n";
+    outputFile << "  \"AllInFeasible\": " << jsonObj["AllInFeasibleSets"].dump() << ",\n";
+    outputFile << "  \"AllUnknown\": " << jsonObj["AllUnknownSets"].dump() << "\n";
+    outputFile << "}\n";
     outputFile << "}\n";
 }
 

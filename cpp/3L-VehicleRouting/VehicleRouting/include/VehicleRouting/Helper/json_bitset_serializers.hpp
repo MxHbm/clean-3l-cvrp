@@ -57,4 +57,33 @@ inline void to_json(json& j,
     }
 }
 
+// ---------- 3) SequenceSet -> array of arrays ----------
+inline void to_json(json& j, const Collections::SequenceSet& set)
+{
+    j = json::array();
+    auto& arr = j.get_ref<json::array_t&>();
+    arr.reserve(set.size());
+    for (const auto& seq: set)
+    {
+        // assumes seq (IdVector) is itself json-serializable (e.g., vector<int>)
+        arr.push_back(seq);
+    }
+}
+
+// ---------- 4) map<LoadingFlag, SequenceSet> ----------
+template <class Hash, class Eq, class MapAlloc>
+inline void to_json(
+    json& j,
+    const std::unordered_map<ContainerLoading::Algorithms::LoadingFlag, Collections::SequenceSet, Hash, Eq, MapAlloc>&
+        map)
+{
+    using LF = ContainerLoading::Algorithms::LoadingFlag;
+    using U = std::underlying_type_t<LF>;
+    j = json::object();
+    for (const auto& [flag, seqSet]: map)
+    {
+        j[std::to_string(static_cast<U>(flag))] = seqSet; // numeric flag keys
+    }
+}
+
 } // namespace nlohmann
