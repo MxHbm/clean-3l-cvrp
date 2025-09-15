@@ -91,6 +91,7 @@ LoadingStatus LoadingChecker::ConstraintProgrammingSolver(PackingType packingTyp
 
     if (status == LoadingStatus::Invalid)
     {
+        AddInvalidRoute(stopIds, loadingMask);
         status = LoadingStatus::Unknown;
     }
 
@@ -126,7 +127,7 @@ LoadingStatus LoadingChecker::ConstraintProgrammingSolverGetPacking(PackingType 
 
     if (status == LoadingStatus::Invalid)
     {
-        status = LoadingStatus::Unknown;
+        throw std::runtime_error("LoadingStatus invalid in get packing step!");
     }
 
     if (status == LoadingStatus::FeasOpt)
