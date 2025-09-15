@@ -91,13 +91,7 @@ LoadingStatus LoadingChecker::ConstraintProgrammingSolver(PackingType packingTyp
 
     if (status == LoadingStatus::Invalid)
     {
-        throw std::runtime_error("Loading status invalid in CP model!");
-    }
-
-    if (isCallTypeExact && status == LoadingStatus::Unknown)
-    {
-        AddInvalidRoute(stopIds, loadingMask);
-        return LoadingStatus::Invalid;
+        status = LoadingStatus::Unknown;
     }
 
     AddStatus(stopIds, set, loadingMask, status);
@@ -132,7 +126,7 @@ LoadingStatus LoadingChecker::ConstraintProgrammingSolverGetPacking(PackingType 
 
     if (status == LoadingStatus::Invalid)
     {
-        throw std::runtime_error("Loading status invalid in CP model!");
+        status = LoadingStatus::Unknown;
     }
 
     if (status == LoadingStatus::FeasOpt)
