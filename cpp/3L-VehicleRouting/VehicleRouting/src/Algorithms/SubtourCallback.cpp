@@ -774,8 +774,9 @@ bool SubtourCallback3D::CheckRoutes()
 
             if (routeStatus == LoadingStatus::Invalid)
             {
-                mLogFile << "Optimization aborted due to invalid loading status!";
-                this->abort();
+                mLogFile << "Optimization found Invalid solution changed to infeasible due to invalid loading status!";
+                // this->abort();
+                mCutAdded = true;
 
                 ////return false;
             }
@@ -936,15 +937,18 @@ LoadingStatus SubtourCallback3DAllSimple::CheckRouteExact(const Subtour& subtour
         case LoadingStatus::Infeasible:
             mClock.end();
             CallbackTracker.UpdateElement(CallbackElement::ExactInf, mClock.elapsed());
-
             break;
         case LoadingStatus::Invalid:
             mClock.end();
             CallbackTracker.UpdateElement(CallbackElement::ExactInvalid, mClock.elapsed());
-            return LoadingStatus::Invalid;
+            mLogFile << "Optimization found Invalid solution changed to infeasible due to invalid loading status!";
+            // return LoadingStatus::Invalid;
+            break;
         case LoadingStatus::Unknown:
+            mLogFile << "Optimization found Unknown solution changed to infeasible!";
             mClock.end();
-            throw std::runtime_error("LoadingStatus is Unknown after exact CP model in CheckRouteExact().");
+            // throw std::runtime_error("LoadingStatus is Unknown after exact CP model in CheckRouteExact().");
+            break;
     }
 
     mClock.start();
@@ -1018,7 +1022,6 @@ LoadingStatus
         case LoadingStatus::Unknown:
             mClock.end();
             CallbackTracker.UpdateElement(CallbackElement::ExactLimitUnk, mClock.elapsed());
-
             break;
         case LoadingStatus::Infeasible:
             mClock.end();
@@ -1028,7 +1031,8 @@ LoadingStatus
         default:
             mClock.end();
             CallbackTracker.UpdateElement(CallbackElement::ExactInvalid, mClock.elapsed());
-            return LoadingStatus::Invalid;
+            mLogFile << "Optimization found Invalid solution changed to infeasible due to invalid loading status!";
+            return LoadingStatus::Infeasible;
     }
 
     if (Lifting(subtour, container, items))
@@ -1066,10 +1070,13 @@ LoadingStatus
             case LoadingStatus::Invalid:
                 mClock.end();
                 CallbackTracker.UpdateElement(CallbackElement::ExactInvalid, mClock.elapsed());
-                return LoadingStatus::Invalid;
+                mLogFile << "Optimization found Invalid solution changed to infeasible due to invalid loading status!";
+                return LoadingStatus::Infeasible;
             case LoadingStatus::Unknown:
                 mClock.end();
-                throw std::runtime_error("LoadingStatus is Unknown after exact CP model in CheckRouteExact().");
+                mLogFile << "Optimization found Unknown solution changed to infeasible!";
+                // throw std::runtime_error("LoadingStatus is Unknown after exact CP model in CheckRouteExact().");
+                return LoadingStatus::Infeasible;
         }
     }
 
@@ -1147,8 +1154,6 @@ LoadingStatus SubtourCallback3DNoSupport::CheckRouteExact(const Subtour& subtour
         case LoadingStatus::Unknown:
             mClock.end();
             CallbackTracker.UpdateElement(CallbackElement::ExactLimitUnk, mClock.elapsed());
-
-            break;
         case LoadingStatus::Infeasible:
             mClock.end();
             CallbackTracker.UpdateElement(CallbackElement::ExactLimitInf, mClock.elapsed());
@@ -1157,7 +1162,8 @@ LoadingStatus SubtourCallback3DNoSupport::CheckRouteExact(const Subtour& subtour
         default:
             mClock.end();
             CallbackTracker.UpdateElement(CallbackElement::ExactInvalid, mClock.elapsed());
-            return LoadingStatus::Invalid;
+            mLogFile << "Optimization found Invalid solution changed to infeasible due to invalid loading status!";
+            break;
     }
 
     if (Lifting(subtour, container, items))
@@ -1196,10 +1202,13 @@ LoadingStatus SubtourCallback3DNoSupport::CheckRouteExact(const Subtour& subtour
             case LoadingStatus::Invalid:
                 mClock.end();
                 CallbackTracker.UpdateElement(CallbackElement::ExactInvalid, mClock.elapsed());
-                return LoadingStatus::Invalid;
+                mLogFile << "Optimization found Invalid solution changed to infeasible due to invalid loading status!";
+                return LoadingStatus::Infeasible;
             case LoadingStatus::Unknown:
                 mClock.end();
-                throw std::runtime_error("LoadingStatus is Unknown after exact CP model in CheckRouteExact().");
+                mLogFile << "Optimization found Unknown solution changed to infeasible!";
+                return LoadingStatus::Infeasible;
+                // throw std::runtime_error("LoadingStatus is Unknown after exact CP model in CheckRouteExact().");
         }
     }
 
@@ -1286,13 +1295,14 @@ LoadingStatus
             {
                 mClock.end();
                 CallbackTracker.UpdateElement(CallbackElement::ExactLimitUnk, mClock.elapsed());
-
-                return LoadingStatus::Unknown;
+                mLogFile << "Optimization found Unknown solution changed to infeasible!";
+                break;
             }
         default:
             mClock.end();
             CallbackTracker.UpdateElement(CallbackElement::ExactInvalid, mClock.elapsed());
-            return LoadingStatus::Invalid;
+            mLogFile << "Optimization found Invalid solution changed to infeasible due to invalid loading status!";
+            break;
     }
 
     if (Lifting(subtour, container, items))
@@ -1367,13 +1377,14 @@ LoadingStatus SubtourCallback3DLoadingOnly::CheckRouteExact(const Subtour& subto
             {
                 mClock.end();
                 CallbackTracker.UpdateElement(CallbackElement::ExactLimitUnk, mClock.elapsed());
-
-                return LoadingStatus::Unknown;
             }
+            mLogFile << "Optimization found Unknown solution changed to infeasible!";
+            break;
         default:
             mClock.end();
             CallbackTracker.UpdateElement(CallbackElement::ExactInvalid, mClock.elapsed());
-            return LoadingStatus::Invalid;
+            mLogFile << "Optimization found Invalid solution changed to infeasible due to invalid loading status!";
+            break;
     }
 
     Lifting(subtour, container, items);

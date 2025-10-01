@@ -127,7 +127,8 @@ LoadingStatus LoadingChecker::ConstraintProgrammingSolverGetPacking(PackingType 
 
     if (status == LoadingStatus::Invalid)
     {
-        throw std::runtime_error("LoadingStatus invalid in get packing step!");
+        status = LoadingStatus::Infeasible;
+        // throw std::runtime_error("LoadingStatus invalid in get packing step!");
     }
 
     if (status == LoadingStatus::FeasOpt)
