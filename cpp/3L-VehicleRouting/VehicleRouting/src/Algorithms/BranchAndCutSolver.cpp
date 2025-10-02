@@ -96,6 +96,7 @@ void BranchAndCutSolver::Initialize()
 
             if (relStatus != LoadingStatus::FeasOpt)
             {
+                mLogFile << " Single customer route is Infeasible --> Abort!" << "\n";
                 throw std::runtime_error("Single customer route is infeasible!");
             }
         }
@@ -428,6 +429,7 @@ std::vector<Route> BranchAndCutSolver::SetGivenStartSolution()
 
         if (exactStatus == LoadingStatus::Infeasible)
         {
+            mLogFile << " Infeasible start solution! --> Abort!" << "\n";
             throw std::runtime_error("Loading infeasible according to CP model.");
         }
     }
@@ -551,6 +553,7 @@ std::vector<Route> BranchAndCutSolver::SetHardCodedStartSolution()
 
         if (exactStatus == LoadingStatus::Infeasible)
         {
+            mLogFile << " Infeasible start solution --> Abort!" << "\n";
             throw std::runtime_error("Loading infeasible according to CP model.");
         }
     }
@@ -674,6 +677,8 @@ bool BranchAndCutSolver::CheckPath(const Collections::IdVector& path, Container&
         mInfeasibleTailPaths.emplace_back(0, path.front(), path.back());
 
         Collections::IdVector sequence = {path.front(), path.back()};
+        // Added return false as there was nothing before?
+        return false;
     }
 
     return true;
@@ -1008,6 +1013,7 @@ void BranchAndCutSolver::DeterminePackingSolution()
 
         if (exactStatus == LoadingStatus::Infeasible)
         {
+            mLogFile << " Infeasible solution CPGetPacking --> Abort!" << "\n";
             throw std::runtime_error("Loading infeasible according to CP model.");
         }
 
