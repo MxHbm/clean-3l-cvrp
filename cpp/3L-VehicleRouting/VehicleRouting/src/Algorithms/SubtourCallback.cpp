@@ -876,7 +876,8 @@ void SubtourCallback3D::CheckReversePath(const Collections::IdVector& sequence, 
 
     timer.start();
 
-    double maxRuntime = mInputParameters->DetermineMaxRuntime(BranchAndCutParams::CallType::ReversePath);
+    double residualTime = mInputParameters->MIPSolver.TimeLimit - this->getDoubleInfo(GRB_CB_RUNTIME);
+    double maxRuntime = mInputParameters->DetermineMaxRuntime(BranchAndCutParams::CallType::ReversePath, residualTime);
     auto cpStatus = mLoadingChecker->ConstraintProgrammingSolver(
         PackingType::Complete,
         container,
@@ -914,7 +915,8 @@ LoadingStatus SubtourCallback3DAllSimple::CheckRouteExact(const Subtour& subtour
 {
     // Solve complete CP model again if unknown to prove feasibility/infeasibility
     mClock.start();
-    double maxRuntime = mInputParameters->DetermineMaxRuntime(BranchAndCutParams::CallType::Exact);
+    double residualTime = mInputParameters->MIPSolver.TimeLimit - this->getDoubleInfo(GRB_CB_RUNTIME);
+    double maxRuntime = mInputParameters->DetermineMaxRuntime(BranchAndCutParams::CallType::Exact, residualTime);
 
     auto exactStatus =
         mLoadingChecker->ConstraintProgrammingSolver(PackingType::Complete,
@@ -995,7 +997,9 @@ LoadingStatus
     // Reasoning: feasibility can be proven quickly -> mabye lifting with relaxed problem is faster than solving
     // complete problem
     mClock.start();
-    double maxRuntimeExactLimit = mInputParameters->DetermineMaxRuntime(BranchAndCutParams::CallType::ExactLimit);
+    double residualTime = mInputParameters->MIPSolver.TimeLimit - this->getDoubleInfo(GRB_CB_RUNTIME);
+    double maxRuntimeExactLimit =
+        mInputParameters->DetermineMaxRuntime(BranchAndCutParams::CallType::ExactLimit, residualTime);
     auto exactStatus = mLoadingChecker->ConstraintProgrammingSolver(
         PackingType::Complete,
         container,
@@ -1127,7 +1131,9 @@ LoadingStatus SubtourCallback3DNoSupport::CheckRouteExact(const Subtour& subtour
                                                           std::vector<Cuboid>& items)
 {
     mClock.start();
-    double maxRuntimeExactLimit = mInputParameters->DetermineMaxRuntime(BranchAndCutParams::CallType::ExactLimit);
+    double residualTime = mInputParameters->MIPSolver.TimeLimit - this->getDoubleInfo(GRB_CB_RUNTIME);
+    double maxRuntimeExactLimit =
+        mInputParameters->DetermineMaxRuntime(BranchAndCutParams::CallType::ExactLimit, residualTime);
     auto exactStatus = mLoadingChecker->ConstraintProgrammingSolver(
         PackingType::Complete,
         container,
