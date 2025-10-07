@@ -117,15 +117,19 @@ void SubtourCallback::callback()
                                                  this->getDoubleInfo(GRB_CB_MIPNODE_NODCNT),
                                                  this->getDoubleInfo(GRB_CB_MIPNODE_OBJBND));
 
+                // NEW: per-callback budget computed ONCE from residual time
+                double residualTime = mInputParameters->MIPSolver.TimeLimit - this->getDoubleInfo(GRB_CB_RUNTIME);
+                double callbackBudget = std::max(0.0, residualTime - 5.0); // small safety buffer
+
                 // Check fractional solution
                 auto checkFractionalSolutionTime =
                     measure<>::duration(std::bind_front(&SubtourCallback::CheckFractionalSolution, this));
                 CallbackTracker.UpdateElement(CallbackElement::FractionalSolutions,
                                               static_cast<uint64_t>(checkFractionalSolutionTime.count()));
 
-                // Solve set partitioning heuristic
+                // Solve set partitioning heuristic (heavy) – pass budget
                 auto [spHeuristicCalled, heuristicTime] = measure<>::durationWithReturn(
-                    std::bind_front(&SubtourCallback::SolveSetPartitioningHeuristic, this));
+                    std::bind_front(&SubtourCallback::SolveSetPartitioningHeuristic, this, std::ref(callbackBudget)));
                 if (!spHeuristicCalled)
                 {
                     break;
@@ -141,9 +145,14 @@ void SubtourCallback::callback()
                 ////mLogFile << mCurrentNode << " | SOL | Feas Routes: " <<
                 ////mLoadingChecker->GetFeasibleRoutes().size()<< "\n";
 
+                // NEW: per-callback budget computed ONCE from residual time
+                double residualTime = mInputParameters->MIPSolver.TimeLimit - this->getDoubleInfo(GRB_CB_RUNTIME);
+                double callbackBudget = std::max(0.0, residualTime - 5.0); // small safety buffer
+
                 // Check integer solution
-                auto checkIntegerSolutionTime =
-                    measure<>::duration(std::bind_front(&SubtourCallback::CheckIntegerSolution, this));
+                // Check integer solution (heavy) – pass budget
+                auto checkIntegerSolutionTime = measure<>::duration(
+                    std::bind_front(&SubtourCallback::CheckIntegerSolution, this, std::ref(callbackBudget)));
                 CallbackTracker.UpdateElement(CallbackElement::IntegerSolutions,
                                               static_cast<uint64_t>(checkIntegerSolutionTime.count()));
             }
@@ -261,7 +270,7 @@ void SubtourCallback::FillXVariableValuesFromSolution()
     }
 }
 
-void SubtourCallback::CheckIntegerSolution()
+void SubtourCallback::CheckIntegerSolution(double& callbackBudget)
 {
     FillXVariableValuesFromSolution();
 
@@ -269,12 +278,12 @@ void SubtourCallback::CheckIntegerSolution()
     auto subtourTime = measure<>::duration(std::bind_front(&SubtourCallback::FindIntegerSubtours, this));
     CallbackTracker.UpdateElement(CallbackElement::DetermineRoutes, static_cast<uint64_t>(subtourTime.count()));
 
-    // Check integer routes for feasibility
+    // NEW: pass budget into CheckRoutes
     auto [solutionFeasible, checkRoutesTime] =
-        measure<>::durationWithReturn(std::bind_front(&SubtourCallback::CheckRoutes, this));
+        measure<>::durationWithReturn(std::bind_front(&SubtourCallback::CheckRoutes, this, std::ref(callbackBudget)));
     CallbackTracker.UpdateElement(CallbackElement::CheckRoutes, static_cast<uint64_t>(checkRoutesTime.count()));
 
-    if (!solutionFeasible)
+    if (!solutionFeasible || callbackBudget <= 0.0)
     {
         return;
     }
@@ -584,9 +593,14 @@ void SubtourCallback::AddCuts(const std::vector<Cut>& cuts)
     }
 }
 
-bool SubtourCallback::SolveSetPartitioningHeuristic()
+bool SubtourCallback::SolveSetPartitioningHeuristic(double& callbackBudget)
+
 {
     if (SPHeuristic == nullptr)
+    {
+        return false;
+    }
+    if (callbackBudget <= 0.0)
     {
         return false;
     }
@@ -595,24 +609,33 @@ bool SubtourCallback::SolveSetPartitioningHeuristic()
     {
         return false;
     }
-
     if (mLoadingChecker->GetNumberOfFeasibleRoutes() - mLastSolutionCount
         < mInputParameters->BranchAndCut.SetPartitioningHeuristicThreshold)
     {
         return false;
     }
 
-    mLogFile << mCurrentNode << " : SP-Heuristic with " << mLoadingChecker->GetNumberOfFeasibleRoutes() << " routes."
-             << "\n";
+    // Optional: skip late if little budget remains (fast bail)
+    if (callbackBudget < 2.0)
+    {
+        return false;
+    }
 
-    auto newSolution = SPHeuristic->Run(this->getDoubleInfo(GRB_CB_MIPNODE_OBJBST) - 1e-5);
+    mLogFile << mCurrentNode << " : SP-Heuristic with " << mLoadingChecker->GetNumberOfFeasibleRoutes() << " routes.\n";
+    FunctionTimer timer;
+    // If SPHeuristic::Run can accept a time limit, pass a capped slice; otherwise, bail if small
+    const double slice = std::min(callbackBudget, 5.0); // e.g. give it up to 5s from the budget
+    timer.start();
+    auto newSolution = SPHeuristic->Run(this->getDoubleInfo(GRB_CB_MIPNODE_OBJBST) - 1e-5 /*, slice if supported */);
+    timer.end();
+    callbackBudget = std::max(0.0, callbackBudget - timer.elapsedSeconds());
 
     mLogFile << "SC ObjVal:" << SPHeuristic->GetSCObjVal() << " | SP ObjVal: " << SPHeuristic->GetSPObjVal() << "\n";
 
     mLastSolutionCount = mLoadingChecker->GetNumberOfFeasibleRoutes();
     mLastTime = this->getDoubleInfo(GRB_CB_RUNTIME);
 
-    if (!newSolution)
+    if (!newSolution || callbackBudget <= 0.0)
     {
         return true;
     }
@@ -665,7 +688,7 @@ void SubtourCallback::InjectSolution()
     SetHeuristicSolution(solution);
 }
 
-bool SubtourCallback1D::CheckRoutes()
+bool SubtourCallback1D::CheckRoutes(double& callbackBudget)
 {
     const Vehicle& vehicle = mInstance->Vehicles.front();
     const Container& container = vehicle.Containers.front();
@@ -674,6 +697,9 @@ bool SubtourCallback1D::CheckRoutes()
 
     for (const auto& subtour: mSubtours)
     {
+        if (callbackBudget <= 0.0)
+            break; // NEW: bail out
+
         CallbackTracker.Counter[CallbackElement::IntegerRoutes]++;
 
         if (subtour.Sequence.size() == 1)
@@ -723,7 +749,7 @@ bool SubtourCallback1D::CheckRoutes()
     return !cutAdded;
 }
 
-bool SubtourCallback3D::CheckRoutes()
+bool SubtourCallback3D::CheckRoutes(double& callbackBudget)
 {
     const auto& vehicle = mInstance->Vehicles.front();
     const auto& container = vehicle.Containers.front();
@@ -732,6 +758,9 @@ bool SubtourCallback3D::CheckRoutes()
 
     for (const auto& subtour: mSubtours)
     {
+        if (callbackBudget <= 0.0)
+            break; // NEW: bail out
+
         CallbackTracker.Counter[CallbackElement::IntegerRoutes]++;
 
         if (subtour.Sequence.size() == 1)
@@ -759,7 +788,6 @@ bool SubtourCallback3D::CheckRoutes()
             mCutAdded = true;
             mClock.end();
             CallbackTracker.UpdateElement(CallbackElement::Disconnected, mClock.elapsed());
-
             continue;
         }
 
@@ -767,21 +795,17 @@ bool SubtourCallback3D::CheckRoutes()
 
         if (minVehicles == 1)
         {
-            auto checkFunc = std::bind_front(&SubtourCallback3D::CheckSingleVehicleSubtour, this, subtour, container);
+            mClock.start();
+            auto checkFunc = std::bind_front(
+                &SubtourCallback3D::CheckSingleVehicleSubtour, this, subtour, container, std::ref(callbackBudget));
             auto [routeStatus, singleVehicleTime] = measure<>::durationWithReturn(checkFunc);
+            mClock.end();
+            callbackBudget = std::max(0.0, callbackBudget - mClock.elapsedSeconds());
+
             CallbackTracker.UpdateElement(CallbackElement::SingleVehicle,
                                           static_cast<uint64_t>(singleVehicleTime.count()));
 
-            if (routeStatus == LoadingStatus::Invalid)
-            {
-                mLogFile << "Optimization found Invalid solution changed to infeasible [SubtourCallback]!" << "\n";
-                // this->abort();
-                mCutAdded = true;
-
-                ////return false;
-            }
-
-            if (routeStatus == LoadingStatus::Infeasible)
+            if (routeStatus == LoadingStatus::Invalid || routeStatus == LoadingStatus::Infeasible)
             {
                 mCutAdded = true;
             }
@@ -795,21 +819,28 @@ bool SubtourCallback3D::CheckRoutes()
             mClock.end();
             CallbackTracker.UpdateElement(CallbackElement::MinVehApproxInf, mClock.elapsed());
         }
+
+        if (callbackBudget <= 0.0)
+            break; // NEW: stop after work if empty
     }
 
     return !mCutAdded;
 }
 
-LoadingStatus SubtourCallback3D::CheckSingleVehicleSubtour(const Subtour& subtour, Container& container)
+LoadingStatus
+    SubtourCallback3D::CheckSingleVehicleSubtour(const Subtour& subtour, Container& container, double& callbackBudget)
 {
     if (RouteCheckedAndFeasible(subtour.Sequence))
     {
         return LoadingStatus::FeasOpt;
     }
-
     if (CustomerCombinationInfeasible(subtour.Sequence, subtour.CustomersInRoute))
     {
         return LoadingStatus::Infeasible;
+    }
+    if (callbackBudget <= 0.0)
+    {
+        return LoadingStatus::Unknown;
     }
 
     auto selectedItems = InterfaceConversions::SelectItems(subtour.Sequence, mInstance->Nodes, false);
@@ -819,7 +850,7 @@ LoadingStatus SubtourCallback3D::CheckSingleVehicleSubtour(const Subtour& subtou
         return LoadingStatus::FeasOpt;
     }
 
-    return CheckRouteExact(subtour, container, selectedItems);
+    return CheckRouteExact(subtour, container, selectedItems, callbackBudget);
 }
 
 bool SubtourCallback3D::CheckRouteHeuristic(const Collections::IdVector& sequence,
@@ -848,8 +879,13 @@ bool SubtourCallback3D::CheckRouteHeuristic(const Collections::IdVector& sequenc
     return false;
 }
 
-void SubtourCallback3D::CheckReversePath(const Collections::IdVector& sequence, Container& container)
+void SubtourCallback3D::CheckReversePath(const Collections::IdVector& sequence,
+                                         Container& container,
+                                         double& callbackBudget)
 {
+    if (callbackBudget <= 0.0)
+        return;
+
     Collections::IdVector reversedSequence(sequence.size());
     std::reverse_copy(std::begin(sequence), std::end(sequence), std::begin(reversedSequence));
 
@@ -875,9 +911,13 @@ void SubtourCallback3D::CheckReversePath(const Collections::IdVector& sequence, 
     }
 
     timer.start();
+    // Use budget slice, not a fresh residual recompute
+    const double slice =
+        std::min(callbackBudget,
+                 mInputParameters->DetermineMaxRuntime(BranchAndCutParams::CallType::ReversePath, callbackBudget));
+    if (slice <= 0.0)
+        return;
 
-    double residualTime = mInputParameters->MIPSolver.TimeLimit - this->getDoubleInfo(GRB_CB_RUNTIME);
-    double maxRuntime = mInputParameters->DetermineMaxRuntime(BranchAndCutParams::CallType::ReversePath, residualTime);
     auto cpStatus = mLoadingChecker->ConstraintProgrammingSolver(
         PackingType::Complete,
         container,
@@ -885,7 +925,10 @@ void SubtourCallback3D::CheckReversePath(const Collections::IdVector& sequence, 
         reversedSequence,
         items,
         mInputParameters->IsExact(BranchAndCutParams::CallType::ReversePath),
-        maxRuntime);
+        slice);
+
+    timer.end();
+    callbackBudget = std::max(0.0, callbackBudget - timer.elapsedSeconds());
 
     switch (cpStatus)
     {
@@ -911,12 +954,18 @@ void SubtourCallback3D::CheckReversePath(const Collections::IdVector& sequence, 
 
 LoadingStatus SubtourCallback3DAllSimple::CheckRouteExact(const Subtour& subtour,
                                                           Container& container,
-                                                          std::vector<Cuboid>& items)
+                                                          std::vector<Cuboid>& items,
+                                                          double& callbackBudget)
 {
+    if (callbackBudget <= 0.0)
+        return LoadingStatus::Unknown;
+
     // Solve complete CP model again if unknown to prove feasibility/infeasibility
     mClock.start();
-    double residualTime = mInputParameters->MIPSolver.TimeLimit - this->getDoubleInfo(GRB_CB_RUNTIME);
-    double maxRuntime = mInputParameters->DetermineMaxRuntime(BranchAndCutParams::CallType::Exact, residualTime);
+
+    const double slice1 =
+        std::min(callbackBudget,
+                 mInputParameters->DetermineMaxRuntime(BranchAndCutParams::CallType::ExactLimit, callbackBudget));
 
     auto exactStatus =
         mLoadingChecker->ConstraintProgrammingSolver(PackingType::Complete,
@@ -925,18 +974,19 @@ LoadingStatus SubtourCallback3DAllSimple::CheckRouteExact(const Subtour& subtour
                                                      subtour.Sequence,
                                                      items,
                                                      mInputParameters->IsExact(BranchAndCutParams::CallType::Exact),
-                                                     maxRuntime);
+                                                     slice1);
+
+    mClock.end();
+    callbackBudget = std::max(0.0, callbackBudget - mClock.elapsedSeconds());
 
     switch (exactStatus)
     {
         case LoadingStatus::FeasOpt:
             LocalSearch::RunIntraImprovement(mInstance, mLoadingChecker, mInputParameters, subtour.Sequence);
-            mClock.end();
             CallbackTracker.UpdateElement(CallbackElement::ExactFeas, mClock.elapsed());
 
             return LoadingStatus::FeasOpt;
         case LoadingStatus::Infeasible:
-            mClock.end();
             CallbackTracker.UpdateElement(CallbackElement::ExactInf, mClock.elapsed());
             break;
         // Add cut also fpr unknown! --> unkwon == invalid
@@ -946,11 +996,15 @@ LoadingStatus SubtourCallback3DAllSimple::CheckRouteExact(const Subtour& subtour
             // return LoadingStatus::Invalid;
             break;
     }
+    if (callbackBudget <= 0.0)
+        return LoadingStatus::Unknown;
 
     mClock.start();
     AddLazyConstraints({mLazyConstraintsGenerator->CreateConstraint(CutType::InfeasibleTailPath, subtour.Sequence)});
     mClock.end();
     CallbackTracker.UpdateElement(CallbackElement::InfeasibleTailPathInequality, mClock.elapsed());
+
+    callbackBudget = std::max(0.0, callbackBudget - mClock.elapsedSeconds());
 
     return LoadingStatus::Infeasible;
 }
@@ -989,17 +1043,25 @@ bool SubtourCallback3DAll::Lifting(const Subtour& subtour, Container& container,
     return false;
 }
 
-LoadingStatus
-    SubtourCallback3DAll::CheckRouteExact(const Subtour& subtour, Container& container, std::vector<Cuboid>& items)
+LoadingStatus SubtourCallback3DAll::CheckRouteExact(const Subtour& subtour,
+                                                    Container& container,
+                                                    std::vector<Cuboid>& items,
+                                                    double& callbackBudget)
 {
     // Solve complete CP model with time limit
     // Try lifting although sequence might be feasible (status unknown with time limit)
     // Reasoning: feasibility can be proven quickly -> mabye lifting with relaxed problem is faster than solving
     // complete problem
+    if (callbackBudget <= 0.0)
+        return LoadingStatus::Unknown;
+
+    // Solve complete CP model again if unknown to prove feasibility/infeasibility
     mClock.start();
-    double residualTime = mInputParameters->MIPSolver.TimeLimit - this->getDoubleInfo(GRB_CB_RUNTIME);
-    double maxRuntimeExactLimit =
-        mInputParameters->DetermineMaxRuntime(BranchAndCutParams::CallType::ExactLimit, residualTime);
+
+    const double slice1 =
+        std::min(callbackBudget,
+                 mInputParameters->DetermineMaxRuntime(BranchAndCutParams::CallType::ExactLimit, callbackBudget));
+
     auto exactStatus = mLoadingChecker->ConstraintProgrammingSolver(
         PackingType::Complete,
         container,
@@ -1007,30 +1069,32 @@ LoadingStatus
         subtour.Sequence,
         items,
         mInputParameters->IsExact(BranchAndCutParams::CallType::ExactLimit),
-        maxRuntimeExactLimit);
+        slice1);
+
+    mClock.end();
+    callbackBudget = std::max(0.0, callbackBudget - mClock.elapsedSeconds());
 
     switch (exactStatus)
     {
         case LoadingStatus::FeasOpt:
             LocalSearch::RunIntraImprovement(mInstance, mLoadingChecker, mInputParameters, subtour.Sequence);
-            mClock.end();
             CallbackTracker.UpdateElement(CallbackElement::ExactLimitFeas, mClock.elapsed());
 
             return LoadingStatus::FeasOpt;
         case LoadingStatus::Unknown:
-            mClock.end();
             CallbackTracker.UpdateElement(CallbackElement::ExactLimitUnk, mClock.elapsed());
             break;
         case LoadingStatus::Infeasible:
-            mClock.end();
             CallbackTracker.UpdateElement(CallbackElement::ExactLimitInf, mClock.elapsed());
             break;
         default:
-            mClock.end();
             CallbackTracker.UpdateElement(CallbackElement::ExactInvalid, mClock.elapsed());
             mLogFile << "Optimization found Invalid solution changed to infeasible [SubtourCallback]!" << "\n";
             break;
     }
+
+    if (callbackBudget <= 0.0)
+        return LoadingStatus::Infeasible;
 
     if (Lifting(subtour, container, items))
     {
@@ -1038,12 +1102,12 @@ LoadingStatus
     }
 
     // Solve complete CP model again if unknown to prove feasibility/infeasibility
-    mClock.start();
-    if (exactStatus == LoadingStatus::Unknown)
+    // Optional second pass only if Unknown and budget remains
+    if (exactStatus == LoadingStatus::Unknown && callbackBudget > 0.5)
     {
-        double residualTime = mInputParameters->MIPSolver.TimeLimit - this->getDoubleInfo(GRB_CB_RUNTIME);
-        double maxRuntime = mInputParameters->DetermineMaxRuntime(BranchAndCutParams::CallType::Exact, residualTime);
-
+        const double slice2 = std::min(
+            callbackBudget, mInputParameters->DetermineMaxRuntime(BranchAndCutParams::CallType::Exact, callbackBudget));
+        mClock.start();
         exactStatus =
             mLoadingChecker->ConstraintProgrammingSolver(PackingType::Complete,
                                                          container,
@@ -1051,26 +1115,25 @@ LoadingStatus
                                                          subtour.Sequence,
                                                          items,
                                                          mInputParameters->IsExact(BranchAndCutParams::CallType::Exact),
-                                                         maxRuntime);
+                                                         slice2);
+
+        mClock.end();
+        callbackBudget = std::max(0.0, callbackBudget - mClock.elapsedSeconds());
 
         switch (exactStatus)
         {
             case LoadingStatus::FeasOpt:
                 LocalSearch::RunIntraImprovement(mInstance, mLoadingChecker, mInputParameters, subtour.Sequence);
-                mClock.end();
                 CallbackTracker.UpdateElement(CallbackElement::ExactFeas, mClock.elapsed());
                 return LoadingStatus::FeasOpt;
             case LoadingStatus::Infeasible:
-                mClock.end();
                 CallbackTracker.UpdateElement(CallbackElement::ExactInf, mClock.elapsed());
                 break;
             case LoadingStatus::Invalid:
-                mClock.end();
                 CallbackTracker.UpdateElement(CallbackElement::ExactInvalid, mClock.elapsed());
                 mLogFile << "Optimization found Invalid solution changed to infeasible [SubtourCallback]!" << "\n";
                 break;
             case LoadingStatus::Unknown:
-                mClock.end();
                 mLogFile << "Optimization found Unknown solution changed to infeasible [SubtourCallback]!" << "\n";
                 CallbackTracker.UpdateElement(CallbackElement::ExactInvalid, mClock.elapsed());
                 // throw std::runtime_error("LoadingStatus is Unknown after exact CP model in CheckRouteExact().");
@@ -1082,19 +1145,14 @@ LoadingStatus
     AddLazyConstraints({mLazyConstraintsGenerator->CreateConstraint(CutType::TailTournament, subtour.Sequence)});
     mClock.end();
     CallbackTracker.UpdateElement(CallbackElement::TailPathInequality, mClock.elapsed());
-    /*
-    if (mInputParameters->BranchAndCut.RetrieveGeneratedRoutes)
-    {
-        mLoadingChecker->AddTailTournamentConstraint(subtour.Sequence);
-    }
-    */
-    // Check reverse path to
-    //   - create new feasible route, or
-    //   - create stronger cuts.
+
     mClock.start();
-    CheckReversePath(subtour.Sequence, container);
-    mClock.end();
-    CallbackTracker.UpdateElement(CallbackElement::ReverseSequence, mClock.elapsed());
+    if (callbackBudget > 0.25)
+    {
+        CheckReversePath(subtour.Sequence, container, callbackBudget); // signature changes below
+        mClock.end();
+        callbackBudget = std::max(0.0, callbackBudget - mClock.elapsedSeconds());
+    }
 
     return LoadingStatus::Infeasible;
 }
@@ -1128,12 +1186,23 @@ bool SubtourCallback3DNoSupport::Lifting(const Subtour& subtour, Container& cont
 
 LoadingStatus SubtourCallback3DNoSupport::CheckRouteExact(const Subtour& subtour,
                                                           Container& container,
-                                                          std::vector<Cuboid>& items)
+                                                          std::vector<Cuboid>& items,
+                                                          double& callbackBudget)
 {
+    // Solve complete CP model with time limit
+    // Try lifting although sequence might be feasible (status unknown with time limit)
+    // Reasoning: feasibility can be proven quickly -> mabye lifting with relaxed problem is faster than solving
+    // complete problem
+    if (callbackBudget <= 0.0)
+        return LoadingStatus::Unknown;
+
+    // Solve complete CP model again if unknown to prove feasibility/infeasibility
     mClock.start();
-    double residualTime = mInputParameters->MIPSolver.TimeLimit - this->getDoubleInfo(GRB_CB_RUNTIME);
-    double maxRuntimeExactLimit =
-        mInputParameters->DetermineMaxRuntime(BranchAndCutParams::CallType::ExactLimit, residualTime);
+
+    const double slice1 =
+        std::min(callbackBudget,
+                 mInputParameters->DetermineMaxRuntime(BranchAndCutParams::CallType::ExactLimit, callbackBudget));
+
     auto exactStatus = mLoadingChecker->ConstraintProgrammingSolver(
         PackingType::Complete,
         container,
@@ -1141,42 +1210,45 @@ LoadingStatus SubtourCallback3DNoSupport::CheckRouteExact(const Subtour& subtour
         subtour.Sequence,
         items,
         mInputParameters->IsExact(BranchAndCutParams::CallType::ExactLimit),
-        maxRuntimeExactLimit);
+        slice1);
+
+    mClock.end();
+    callbackBudget = std::max(0.0, callbackBudget - mClock.elapsedSeconds());
 
     switch (exactStatus)
     {
         case LoadingStatus::FeasOpt:
             LocalSearch::RunIntraImprovement(mInstance, mLoadingChecker, mInputParameters, subtour.Sequence);
-            mClock.end();
             CallbackTracker.UpdateElement(CallbackElement::ExactLimitFeas, mClock.elapsed());
 
             return LoadingStatus::FeasOpt;
         case LoadingStatus::Unknown:
-            mClock.end();
             CallbackTracker.UpdateElement(CallbackElement::ExactLimitUnk, mClock.elapsed());
+            break;
         case LoadingStatus::Infeasible:
-            mClock.end();
             CallbackTracker.UpdateElement(CallbackElement::ExactLimitInf, mClock.elapsed());
-
             break;
         default:
-            mClock.end();
             CallbackTracker.UpdateElement(CallbackElement::ExactInvalid, mClock.elapsed());
             mLogFile << "Optimization found Invalid solution changed to infeasible [SubtourCallback]!" << "\n";
             break;
     }
+
+    if (callbackBudget <= 0.0)
+        return LoadingStatus::Infeasible;
 
     if (Lifting(subtour, container, items))
     {
         return LoadingStatus::Infeasible;
     }
 
-    mClock.start();
-    if (exactStatus == LoadingStatus::Unknown)
+    // Solve complete CP model again if unknown to prove feasibility/infeasibility
+    // Optional second pass only if Unknown and budget remains
+    if (exactStatus == LoadingStatus::Unknown && callbackBudget > 0.5)
     {
-        double residualTime = mInputParameters->MIPSolver.TimeLimit - this->getDoubleInfo(GRB_CB_RUNTIME);
-        double maxRuntime = mInputParameters->DetermineMaxRuntime(BranchAndCutParams::CallType::Exact, residualTime);
-
+        const double slice2 = std::min(
+            callbackBudget, mInputParameters->DetermineMaxRuntime(BranchAndCutParams::CallType::Exact, callbackBudget));
+        mClock.start();
         exactStatus =
             mLoadingChecker->ConstraintProgrammingSolver(PackingType::Complete,
                                                          container,
@@ -1184,44 +1256,44 @@ LoadingStatus SubtourCallback3DNoSupport::CheckRouteExact(const Subtour& subtour
                                                          subtour.Sequence,
                                                          items,
                                                          mInputParameters->IsExact(BranchAndCutParams::CallType::Exact),
-                                                         maxRuntime);
+                                                         slice2);
+
+        mClock.end();
+        callbackBudget = std::max(0.0, callbackBudget - mClock.elapsedSeconds());
 
         switch (exactStatus)
         {
             case LoadingStatus::FeasOpt:
                 LocalSearch::RunIntraImprovement(mInstance, mLoadingChecker, mInputParameters, subtour.Sequence);
-                mClock.end();
                 CallbackTracker.UpdateElement(CallbackElement::ExactFeas, mClock.elapsed());
-
                 return LoadingStatus::FeasOpt;
             case LoadingStatus::Infeasible:
-                mClock.end();
                 CallbackTracker.UpdateElement(CallbackElement::ExactInf, mClock.elapsed());
-
                 break;
             case LoadingStatus::Invalid:
-                mClock.end();
                 CallbackTracker.UpdateElement(CallbackElement::ExactInvalid, mClock.elapsed());
                 mLogFile << "Optimization found Invalid solution changed to infeasible [SubtourCallback]!" << "\n";
                 break;
             case LoadingStatus::Unknown:
-                mClock.end();
                 mLogFile << "Optimization found Unknown solution changed to infeasible [SubtourCallback]!" << "\n";
                 CallbackTracker.UpdateElement(CallbackElement::ExactInvalid, mClock.elapsed());
-                break;
                 // throw std::runtime_error("LoadingStatus is Unknown after exact CP model in CheckRouteExact().");
+                break;
         }
     }
 
     mClock.start();
-    AddLazyConstraints(mLazyConstraintsGenerator->CreateRegularPathCuts(subtour.Sequence, container));
+    AddLazyConstraints({mLazyConstraintsGenerator->CreateConstraint(CutType::TailTournament, subtour.Sequence)});
     mClock.end();
-    CallbackTracker.UpdateElement(CallbackElement::RegularPathInequality, mClock.elapsed());
+    CallbackTracker.UpdateElement(CallbackElement::TailPathInequality, mClock.elapsed());
 
     mClock.start();
-    CheckReversePath(subtour.Sequence, container);
-    mClock.end();
-    CallbackTracker.UpdateElement(CallbackElement::ReverseSequence, mClock.elapsed());
+    if (callbackBudget > 0.25)
+    {
+        CheckReversePath(subtour.Sequence, container, callbackBudget); // signature changes below
+        mClock.end();
+        callbackBudget = std::max(0.0, callbackBudget - mClock.elapsedSeconds());
+    }
 
     return LoadingStatus::Infeasible;
 }
@@ -1253,17 +1325,23 @@ bool SubtourCallback3DNoLIFO::Lifting(const Subtour& subtour, Container& contain
     return false;
 }
 
-LoadingStatus
-    SubtourCallback3DNoLIFO::CheckRouteExact(const Subtour& subtour, Container& container, std::vector<Cuboid>& items)
+LoadingStatus SubtourCallback3DNoLIFO::CheckRouteExact(const Subtour& subtour,
+                                                       Container& container,
+                                                       std::vector<Cuboid>& items,
+                                                       double& callbackBudget)
+
 {
+    if (callbackBudget <= 0.0)
+        return LoadingStatus::Unknown;
+
     using enum BranchAndCutParams::CallType;
 
-    double residualTime = mInputParameters->MIPSolver.TimeLimit - this->getDoubleInfo(GRB_CB_RUNTIME);
-
+    const double slice1 =
+        std::min(callbackBudget,
+                 mInputParameters->DetermineMaxRuntime(BranchAndCutParams::CallType::ExactLimit, callbackBudget));
     mClock.start();
 
     auto callType = mCutAdded ? ExactLimit : Exact;
-    double maxRuntime = mInputParameters->DetermineMaxRuntime(callType, residualTime);
 
     auto exactStatus = mLoadingChecker->ConstraintProgrammingSolver(PackingType::Complete,
                                                                     container,
@@ -1271,7 +1349,10 @@ LoadingStatus
                                                                     subtour.Sequence,
                                                                     items,
                                                                     mInputParameters->IsExact(callType),
-                                                                    maxRuntime);
+                                                                    slice1);
+
+    mClock.end();
+    callbackBudget = std::max(0.0, callbackBudget - mClock.elapsedSeconds());
 
     auto element = CallbackElement::None;
 
@@ -1279,14 +1360,12 @@ LoadingStatus
     {
         case LoadingStatus::FeasOpt:
             LocalSearch::RunIntraImprovement(mInstance, mLoadingChecker, mInputParameters, subtour.Sequence);
-            mClock.end();
             element = callType == Exact ? CallbackElement::ExactFeas : CallbackElement::ExactLimitFeas;
 
             CallbackTracker.UpdateElement(element, mClock.elapsed());
 
             return LoadingStatus::FeasOpt;
         case LoadingStatus::Infeasible:
-            mClock.end();
             element = callType == Exact ? CallbackElement::ExactInf : CallbackElement::ExactLimitInf;
             CallbackTracker.UpdateElement(element, mClock.elapsed());
 
@@ -1294,17 +1373,18 @@ LoadingStatus
         case LoadingStatus::Unknown:
             if (callType == ExactLimit)
             {
-                mClock.end();
                 CallbackTracker.UpdateElement(CallbackElement::ExactLimitUnk, mClock.elapsed());
                 mLogFile << "Optimization found Unknown solution changed to infeasible [SubtourCallback]!" << "\n";
                 break;
             }
         default:
-            mClock.end();
             CallbackTracker.UpdateElement(CallbackElement::ExactInvalid, mClock.elapsed());
             mLogFile << "Optimization found Invalid solution changed to infeasible [SubtourCallback]!" << "\n";
             break;
     }
+
+    if (callbackBudget <= 0.0)
+        return LoadingStatus::Infeasible;
 
     if (Lifting(subtour, container, items))
     {
@@ -1338,15 +1418,19 @@ bool SubtourCallback3DLoadingOnly::Lifting(const Subtour& subtour,
 
 LoadingStatus SubtourCallback3DLoadingOnly::CheckRouteExact(const Subtour& subtour,
                                                             Container& container,
-                                                            std::vector<Cuboid>& items)
+                                                            std::vector<Cuboid>& items,
+                                                            double& callbackBudget)
 {
     using enum BranchAndCutParams::CallType;
+    if (callbackBudget <= 0.0)
+        return LoadingStatus::Unknown;
 
-    double residualTime = mInputParameters->MIPSolver.TimeLimit - this->getDoubleInfo(GRB_CB_RUNTIME);
+    const double slice1 =
+        std::min(callbackBudget,
+                 mInputParameters->DetermineMaxRuntime(BranchAndCutParams::CallType::ExactLimit, callbackBudget));
     mClock.start();
 
     auto callType = mCutAdded ? ExactLimit : Exact;
-    double maxRuntime = mInputParameters->DetermineMaxRuntime(callType, residualTime);
 
     auto exactStatus = mLoadingChecker->ConstraintProgrammingSolver(PackingType::Complete,
                                                                     container,
@@ -1354,7 +1438,10 @@ LoadingStatus SubtourCallback3DLoadingOnly::CheckRouteExact(const Subtour& subto
                                                                     subtour.Sequence,
                                                                     items,
                                                                     mInputParameters->IsExact(callType),
-                                                                    maxRuntime);
+                                                                    slice1);
+
+    mClock.end();
+    callbackBudget = std::max(0.0, callbackBudget - mClock.elapsedSeconds());
 
     auto element = CallbackElement::None;
 
@@ -1362,13 +1449,11 @@ LoadingStatus SubtourCallback3DLoadingOnly::CheckRouteExact(const Subtour& subto
     {
         case LoadingStatus::FeasOpt:
             LocalSearch::RunIntraImprovement(mInstance, mLoadingChecker, mInputParameters, subtour.Sequence);
-            mClock.end();
             element = callType == Exact ? CallbackElement::ExactFeas : CallbackElement::ExactLimitFeas;
             CallbackTracker.UpdateElement(element, mClock.elapsed());
 
             return LoadingStatus::FeasOpt;
         case LoadingStatus::Infeasible:
-            mClock.end();
             element = callType == Exact ? CallbackElement::ExactInf : CallbackElement::ExactLimitInf;
             CallbackTracker.UpdateElement(element, mClock.elapsed());
 
@@ -1376,17 +1461,18 @@ LoadingStatus SubtourCallback3DLoadingOnly::CheckRouteExact(const Subtour& subto
         case LoadingStatus::Unknown:
             if (callType == ExactLimit)
             {
-                mClock.end();
                 CallbackTracker.UpdateElement(CallbackElement::ExactLimitUnk, mClock.elapsed());
             }
             mLogFile << "Optimization found Unknown solution changed to infeasible [SubtourCallback]!" << "\n";
             break;
         default:
-            mClock.end();
             CallbackTracker.UpdateElement(CallbackElement::ExactInvalid, mClock.elapsed());
             mLogFile << "Optimization found Invalid solution changed to infeasible [SubtourCallback]!" << "\n";
             break;
     }
+
+    if (callbackBudget <= 0.0)
+        return LoadingStatus::Infeasible;
 
     Lifting(subtour, container, items);
 

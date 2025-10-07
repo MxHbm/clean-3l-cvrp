@@ -83,7 +83,7 @@ class SubtourCallback : public GRBCallback
         InitializeCuts();
     }
 
-    //void SaveFeasibleAndPotentiallyExcludedRoutes() const;
+    // void SaveFeasibleAndPotentiallyExcludedRoutes() const;
     void SaveSequenceSetsWithLoadingFlags() const;
 
   protected:
@@ -125,11 +125,11 @@ class SubtourCallback : public GRBCallback
     void FillXVarValuesNode();
     void FillXVariableValuesFromSolution();
 
-    void CheckIntegerSolution();
+    void CheckIntegerSolution(double& callbackBudget);
     void FindIntegerSubtours();
     void AddLazyConstraints(const std::vector<Cut>& lazyConstraints);
 
-    virtual bool CheckRoutes() = 0;
+    virtual bool CheckRoutes(double& callbackBudget) = 0;
     bool RouteCheckedAndFeasible(const Collections::IdVector& sequence);
     bool CustomerCombinationInfeasible(const Collections::IdVector& sequence,
                                        const boost::dynamic_bitset<>& combination);
@@ -138,7 +138,7 @@ class SubtourCallback : public GRBCallback
     void AddFractionalCuts();
     void AddCuts(const std::vector<Cut>& cuts);
 
-    bool SolveSetPartitioningHeuristic();
+    bool SolveSetPartitioningHeuristic(double& callbackBudget);
     void SetHeuristicSolution(const Collections::SequenceVector& routes);
     void InjectSolution();
 };
@@ -154,7 +154,7 @@ class SubtourCallback1D : public SubtourCallback
     : SubtourCallback(vars, instance, loadingChecker, inputParameters, outputPath) {};
 
   private:
-    bool CheckRoutes() override;
+    bool CheckRoutes(double& callbackBudget) override;
 };
 
 class SubtourCallback3D : public SubtourCallback
@@ -168,13 +168,16 @@ class SubtourCallback3D : public SubtourCallback
     : SubtourCallback(vars, instance, loadingChecker, inputParameters, outputPath) {};
 
   protected:
-    bool CheckRoutes() override;
-    LoadingStatus CheckSingleVehicleSubtour(const Subtour& subtour, Container& container);
+    bool CheckRoutes(double& callbackBudget) override;
+    LoadingStatus CheckSingleVehicleSubtour(const Subtour& subtour, Container& container, double& callbackBudget);
     bool CheckRouteHeuristic(const Collections::IdVector&, Container& container, std::vector<Cuboid>& items);
-    void CheckReversePath(const Collections::IdVector&, Container& container);
+    void CheckReversePath(const Collections::IdVector&, Container& container, double& callbackBudget);
     virtual void AddReversePathConstraints(const Collections::IdVector& sequence,
                                            const Collections::IdVector& reverseSequence) = 0;
-    virtual LoadingStatus CheckRouteExact(const Subtour& subtour, Container& container, std::vector<Cuboid>& items) = 0;
+    virtual LoadingStatus CheckRouteExact(const Subtour& subtour,
+                                          Container& container,
+                                          std::vector<Cuboid>& items,
+                                          double& callbackBudget) = 0;
     virtual bool Lifting(const Subtour& subtour, Container& container, std::vector<Cuboid>& items) = 0;
 };
 
@@ -195,7 +198,10 @@ class SubtourCallback3DAllSimple : public SubtourCallback3D
     {
         return false;
     }
-    LoadingStatus CheckRouteExact(const Subtour& subtour, Container& container, std::vector<Cuboid>& items) override;
+    LoadingStatus CheckRouteExact(const Subtour& subtour,
+                                  Container& container,
+                                  std::vector<Cuboid>& items,
+                                  double& callbackBudget) override;
     void AddReversePathConstraints(const Collections::IdVector& sequence [[maybe_unused]],
                                    const Collections::IdVector& reverseSequence [[maybe_unused]]) override
     {
@@ -214,7 +220,10 @@ class SubtourCallback3DAll : public SubtourCallback3D
 
   private:
     bool Lifting(const Subtour& subtour, Container& container, std::vector<Cuboid>& items) override;
-    LoadingStatus CheckRouteExact(const Subtour& subtour, Container& container, std::vector<Cuboid>& items) override;
+    LoadingStatus CheckRouteExact(const Subtour& subtour,
+                                  Container& container,
+                                  std::vector<Cuboid>& items,
+                                  double& callbackBudget) override;
     void AddReversePathConstraints(const Collections::IdVector& sequence,
                                    const Collections::IdVector& reverseSequence) override;
 };
@@ -231,7 +240,10 @@ class SubtourCallback3DNoSupport : public SubtourCallback3D
 
   private:
     bool Lifting(const Subtour& subtour, Container& container, std::vector<Cuboid>& items) override;
-    LoadingStatus CheckRouteExact(const Subtour& subtour, Container& container, std::vector<Cuboid>& items) override;
+    LoadingStatus CheckRouteExact(const Subtour& subtour,
+                                  Container& container,
+                                  std::vector<Cuboid>& items,
+                                  double& callbackBudget) override;
     void AddReversePathConstraints(const Collections::IdVector& sequence,
                                    const Collections::IdVector& reverseSequence) override;
 };
@@ -248,7 +260,10 @@ class SubtourCallback3DNoLIFO : public SubtourCallback3D
 
   private:
     bool Lifting(const Subtour& subtour, Container& container, std::vector<Cuboid>& items) override;
-    LoadingStatus CheckRouteExact(const Subtour& subtour, Container& container, std::vector<Cuboid>& items) override;
+    LoadingStatus CheckRouteExact(const Subtour& subtour,
+                                  Container& container,
+                                  std::vector<Cuboid>& items,
+                                  double& callbackBudget) override;
     void AddReversePathConstraints(const Collections::IdVector& sequence,
                                    const Collections::IdVector& reverseSequence) override;
 };
@@ -265,7 +280,10 @@ class SubtourCallback3DLoadingOnly : public SubtourCallback3D
 
   private:
     bool Lifting(const Subtour& subtour, Container& container, std::vector<Cuboid>& items) override;
-    LoadingStatus CheckRouteExact(const Subtour& subtour, Container& container, std::vector<Cuboid>& items) override;
+    LoadingStatus CheckRouteExact(const Subtour& subtour,
+                                  Container& container,
+                                  std::vector<Cuboid>& items,
+                                  double& callbackBudget) override;
     void AddReversePathConstraints(const Collections::IdVector& sequence,
                                    const Collections::IdVector& reverseSequence) override;
 };

@@ -44,7 +44,19 @@ class FunctionTimer
 
     void end() { mEnd = ClockT::now(); }
 
-    [[nodiscard]] uint64_t elapsed() const { return std::chrono::duration_cast<TimeT>(mEnd - mStart).count(); }
+    // In TimeT units (for logging/CallbackTracker)
+    [[nodiscard]] uint64_t elapsed() const
+    {
+        assert((mEnd != timep_t{}) && "end() must be called before elapsed()");
+        return static_cast<uint64_t>(std::chrono::duration_cast<TimeT>(mEnd - mStart).count());
+    }
+
+    // In seconds (double) — use this for callbackBudget math
+    [[nodiscard]] double elapsedSeconds() const
+    {
+        assert((mEnd != timep_t{}) && "end() must be called before elapsedSeconds()");
+        return std::chrono::duration_cast<std::chrono::duration<double>>(mEnd - mStart).count();
+    }
 
   private:
     timep_t mStart = ClockT::now();

@@ -1001,7 +1001,7 @@ void BranchAndCutSolver::DeterminePackingSolution()
         std::string feasStatusHeur = heuristicStatus == LoadingStatus::FeasOpt ? "feasible" : "infeasible";
         mLogFile << feasStatusHeur << " with packing heuristic | ";
 
-        double maxRuntime = mInputParameters.DetermineMaxRuntime(BranchAndCutParams::CallType::Exact);
+        double maxRuntime = mInputParameters.DetermineMaxRuntime(BranchAndCutParams::CallType::ExactLimit);
         auto exactStatus = mLoadingChecker->ConstraintProgrammingSolverGetPacking(
             PackingType::Complete, container, stopIds, selectedItems, maxRuntime);
 
@@ -1011,10 +1011,9 @@ void BranchAndCutSolver::DeterminePackingSolution()
 
         // TODO: packing as return value of loading checker
 
-        if (exactStatus == LoadingStatus::Infeasible)
+        if (exactStatus != LoadingStatus::FeasOpt)
         {
-            mLogFile << " Infeasible solution CPGetPacking --> Abort!" << "\n";
-            throw std::runtime_error("Loading infeasible according to CP model.");
+            mLogFile << " Feasibe solution could not be proven!" << "\n";
         }
 
         size_t cItems = 0;
