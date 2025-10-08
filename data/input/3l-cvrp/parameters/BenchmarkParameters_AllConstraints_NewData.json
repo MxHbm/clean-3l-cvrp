@@ -54,7 +54,7 @@
         "EnableNoOverlap2DFloor": false,
         "LogFlag": false,
         "Seed": 1000,
-        "Threads": 8
+        "Threads": 6
     },
     "ExtremePointParams": {
         "Algorithm": "ExtremePoint",

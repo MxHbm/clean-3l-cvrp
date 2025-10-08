@@ -444,6 +444,7 @@ std::vector<Route> BranchAndCutSolver::SetGivenStartSolution()
 
     return startSolution;
 }
+
 std::vector<Route> BranchAndCutSolver::SetHardCodedStartSolution()
 {
     FunctionTimer<std::chrono::milliseconds> clock;

@@ -69,12 +69,15 @@ void Run(std::string& inputFilePath,
 
     if (!ifs.is_open())
     {
+        // Switching to Modified Savings!
         std::cerr << "File does not exist or cannot be opened: " << inputFilePath + filename << std::endl;
-        return; // or handle the error as needed
+        inputParameters.BranchAndCut.StartSolution = BranchAndCutParams::StartSolutionType::ModifiedSavings;
+        // return; // or handle the error as needed
     }
 
     auto instance = HelperIO::ParseInstanceJson(ifs);
 
+    std::cerr << "Done instance" << std::endl;
     ////std::ofstream ofs("logfile.txt");
     ////std::cout.rdbuf(ofs.rdbuf());
 
