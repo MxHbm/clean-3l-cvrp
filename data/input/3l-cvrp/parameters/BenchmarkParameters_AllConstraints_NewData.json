@@ -87,7 +87,7 @@
         "Seed": 0,
         "SolutionLimit": 10000,
         "Threads": 6,
-        "TimeLimit": 18000
+        "TimeLimit": 28800
     },
     "UserCutParams": {
         "EpsForIntegrality": 1e-05,

@@ -74,10 +74,14 @@ void Run(std::string& inputFilePath,
         inputParameters.BranchAndCut.StartSolution = BranchAndCutParams::StartSolutionType::ModifiedSavings;
         // return; // or handle the error as needed
     }
+    else
+    {
+        inputParameters.MIPSolver.TimeLimit = 18000;
+    }
 
     auto instance = HelperIO::ParseInstanceJson(ifs);
 
-    std::cerr << "Done instance" << std::endl;
+    std::cerr << inputParameters.MIPSolver.TimeLimit << std::endl;
     ////std::ofstream ofs("logfile.txt");
     ////std::cout.rdbuf(ofs.rdbuf());
 
