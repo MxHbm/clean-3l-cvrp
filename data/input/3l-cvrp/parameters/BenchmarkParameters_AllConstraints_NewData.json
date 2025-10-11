@@ -13,7 +13,7 @@
         "SetPartHeurThreshold": 20,
         "SimpleVersion": false,
         "RetrieveGeneratedRoutes": true,
-        "StartSolution": "Given",
+        "StartSolution": "ModifiedSavings",
         "TimeLimit": [
             [
                 "Exact",
