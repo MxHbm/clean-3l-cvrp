@@ -71,10 +71,17 @@ void Run(std::string& inputFilePath,
     {
         // Switching to Modified Savings!
         std::cerr << "File does not exist or cannot be opened: " << inputFilePath + filename << std::endl;
-        return; // or handle the error as needed
+        inputParameters.BranchAndCut.StartSolution = BranchAndCutParams::StartSolutionType::ModifiedSavings;
+        // return; // or handle the error as needed
+    }
+    else
+    {
+        inputParameters.MIPSolver.TimeLimit = 18000;
     }
 
     auto instance = HelperIO::ParseInstanceJson(ifs);
+
+    std::cerr << inputParameters.MIPSolver.TimeLimit << std::endl;
     ////std::ofstream ofs("logfile.txt");
     ////std::cout.rdbuf(ofs.rdbuf());
 
