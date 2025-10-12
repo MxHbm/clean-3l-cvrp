@@ -104,23 +104,24 @@ std::vector<Route> HelperIO::ParseSolutionJson(std::ifstream& ifs)
 {
     nlohmann::json jf = nlohmann::json::parse(ifs);
 
-    const auto& routesJson = jf["Routes"];
+    const auto& routesJson = jf["Tours"];
 
-    std::vector<Route> routes;
+    std::vector<Model::Route> routes;
 
+    int id = 0;
     for (const auto& routeJson: routesJson)
     {
-        int id = routeJson["Id"];
-        const auto& nodes = routeJson["Nodes"];
+        const auto& nodes = routeJson["Route"];
 
         Collections::IdVector sequence;
         for (const auto& node: nodes)
         {
-            const auto& nodeId = node["ID"];
+            const auto& nodeId = node["InternId"];
             sequence.push_back(nodeId);
         }
 
         routes.emplace_back(id, sequence);
+        ++id;
     }
 
     return routes;

@@ -210,7 +210,8 @@ void BranchAndCutSolver::Preprocessing()
             break;
     };
 
-    InfeasibleArcProcedure();
+    // TODO: Uncomment later
+    // InfeasibleArcProcedure();
 
     mInstance->LowerBoundVehicles = DetermineLowerBoundVehicles();
 
@@ -339,10 +340,8 @@ std::vector<Route> BranchAndCutSolver::SetGivenStartSolution()
 
     auto& container = mInstance->Vehicles.front().Containers.front();
 
-    uint64_t totalTimeHeur = 0;
     uint64_t totalTimeExact = 0;
 
-    int nFeasibleHeur = 0;
     int nFeasibleExact = 0;
 
     for (size_t id = 0; id < startSolution.size(); id++)
@@ -368,23 +367,19 @@ std::vector<Route> BranchAndCutSolver::SetGivenStartSolution()
             }
         }
 
-        auto tour = Tour(mInstance->Nodes[0], mInstance->Vehicles[id], nodesInRoute);
-
         if (totalWeight > container.WeightLimit)
         {
-            throw std::runtime_error("Route " + std::to_string(id) + tour.Print() + " with total weight "
-                                     + std::to_string(totalWeight) + " exceeds weight limit "
-                                     + std::to_string(container.WeightLimit));
+            throw std::runtime_error("Route " + std::to_string(id) + " with total weight " + std::to_string(totalWeight)
+                                     + " exceeds weight limit " + std::to_string(container.WeightLimit));
         }
 
         if (totalVolume > container.Volume)
         {
-            throw std::runtime_error("Route " + std::to_string(id) + tour.Print() + " with total volume "
-                                     + std::to_string(totalVolume) + " exceeds volume limit "
-                                     + std::to_string(container.Volume));
+            throw std::runtime_error("Route " + std::to_string(id) + " with total volume " + std::to_string(totalVolume)
+                                     + " exceeds volume limit " + std::to_string(container.Volume));
         }
 
-        logFile << "Route " << std::to_string(id) + tour.Print() << ": nItems " << std::to_string(selectedItems.size())
+        logFile << "Route " << std::to_string(id) << ": nItems " << std::to_string(selectedItems.size())
                 << " | weight util " + std::to_string(totalWeight / container.WeightLimit)
                 << " | volume util " + std::to_string(totalVolume / container.Volume) << " | ";
 
@@ -395,27 +390,16 @@ std::vector<Route> BranchAndCutSolver::SetGivenStartSolution()
         }
 
         clock.start();
-        auto heuristicStatus =
-            mLoadingChecker->PackingHeuristic(PackingType::Complete, container, sequence, selectedItems);
-        clock.end();
 
-        if (heuristicStatus == LoadingStatus::FeasOpt)
-        {
-            nFeasibleHeur++;
-        }
-
-        std::string feasStatusHeur = heuristicStatus == LoadingStatus::FeasOpt ? "feasible" : "infeasible";
-        logFile << feasStatusHeur << " with packing heuristic : " << std::to_string(clock.elapsed()) << " | ";
-        totalTimeHeur += clock.elapsed();
-
-        clock.start();
+        double maxRuntime = mInputParameters.DetermineMaxRuntime(BranchAndCutParams::CallType::ExactLimit);
         auto exactStatus =
             mLoadingChecker->ConstraintProgrammingSolver(PackingType::Complete,
                                                          container,
                                                          mLoadingChecker->MakeBitset(mInstance->Nodes.size(), sequence),
                                                          sequence,
                                                          selectedItems,
-                                                         mInputParameters.IsExact(BranchAndCutParams::CallType::Exact));
+                                                         mInputParameters.IsExact(BranchAndCutParams::CallType::Exact),
+                                                         maxRuntime);
         clock.end();
 
         if (exactStatus == LoadingStatus::FeasOpt)
@@ -430,14 +414,13 @@ std::vector<Route> BranchAndCutSolver::SetGivenStartSolution()
         if (exactStatus == LoadingStatus::Infeasible)
         {
             mLogFile << " Infeasible start solution! --> Abort!" << "\n";
+            logFile << "Exact status is infeasible and not Unknown! --> Abort!" << "\n";
             throw std::runtime_error("Loading infeasible according to CP model.");
         }
     }
 
-    logFile << "Total heuristic time: " << std::to_string(totalTimeHeur)
-            << " | Feasible: " << std::to_string(nFeasibleHeur) << "\n";
-    mLogFile << "Total heuristic time: " << std::to_string(totalTimeHeur)
-             << " | Feasible: " << std::to_string(nFeasibleHeur) << "\n";
+    mLogFile << "Total exact time: " << std::to_string(totalTimeExact)
+             << " | Feasible: " << std::to_string(nFeasibleExact) << "\n";
     logFile << "Total exact time: " << std::to_string(totalTimeExact)
             << " | Feasible: " << std::to_string(nFeasibleExact) << "\n";
     logFile.close();
