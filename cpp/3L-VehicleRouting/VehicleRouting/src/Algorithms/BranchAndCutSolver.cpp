@@ -210,8 +210,7 @@ void BranchAndCutSolver::Preprocessing()
             break;
     };
 
-    // TODO: Uncomment later
-    // InfeasibleArcProcedure();
+    InfeasibleArcProcedure();
 
     mInstance->LowerBoundVehicles = DetermineLowerBoundVehicles();
 
